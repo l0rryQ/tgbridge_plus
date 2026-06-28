@@ -20,6 +20,7 @@ data class Config(
     val integrations: IntegrationsConfig = IntegrationsConfig(),
     val events: EventsConfig = EventsConfig(),
     val advanced: AdvancedConfig = AdvancedConfig(),
+    val telegramAuth: TelegramAuthConfig = TelegramAuthConfig(),
     @YamlComment(
         "Config file version. Don't change manually",
     )
@@ -242,4 +243,15 @@ data class AdvancedConnectionRetryConfig(
         "Maximum delay between reconnection attempts in milliseconds",
     )
     val maxDelay: Long = 300000,
+)
+
+@Serializable
+data class TelegramAuthConfig(
+    val enabled: Boolean = false,
+    @YamlComment("Telegram group username (e.g. @smetana_mc)")
+    val groupUsername: String = "@smetana_mc",
+    @YamlComment("The name of the chat from the 'chats' list to use for moderation logs. Defaults to the first chat.")
+    val moderationChat: String? = null,
+    val codeExpirationMinutes: Int = 5,
+    val ipConfirmation: Boolean = true,
 )

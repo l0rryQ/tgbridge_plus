@@ -295,10 +295,20 @@ data class TgFile(
 )
 
 @Serializable
+data class TgCallbackQuery(
+    val id: String,
+    val from: TgUser,
+    val message: TgMessage? = null,
+    val data: String? = null,
+)
+
+@Serializable
 data class TgUpdate(
     @SerialName("update_id")
     val updateId: Int,
     val message: TgMessage? = null,
+    @SerialName("callback_query")
+    val callbackQuery: TgCallbackQuery? = null,
 )
 
 @Serializable
@@ -306,6 +316,26 @@ data class TgResponse<T>(
     val ok: Boolean,
     val result: T? = null,
     val description: String? = null,
+)
+
+@Serializable
+data class TgInlineKeyboardButton(
+    val text: String,
+    @SerialName("callback_data")
+    val callbackData: String? = null,
+    val url: String? = null,
+)
+
+@Serializable
+data class TgInlineKeyboardMarkup(
+    @SerialName("inline_keyboard")
+    val inlineKeyboard: List<List<TgInlineKeyboardButton>>,
+)
+
+@Serializable
+data class TgReplyMarkup(
+    @SerialName("inline_keyboard")
+    val inlineKeyboard: List<List<TgInlineKeyboardButton>>? = null,
 )
 
 @Serializable
@@ -324,6 +354,8 @@ data class TgSendMessageRequest(
     val disableWebPagePreview: Boolean,
     @SerialName("disable_notification")
     val disableNotification: Boolean = false,
+    @SerialName("reply_markup")
+    val replyMarkup: TgReplyMarkup? = null,
 )
 
 @Serializable
@@ -348,6 +380,21 @@ data class TgDeleteMessageRequest(
     val chatId: Long,
     @SerialName("message_id")
     val messageId: Int,
+)
+
+@Serializable
+data class TgAnswerCallbackQueryRequest(
+    @SerialName("callback_query_id")
+    val callbackQueryId: String,
+    val text: String? = null,
+    @SerialName("show_alert")
+    val showAlert: Boolean = false,
+)
+
+@Serializable
+data class TgChatMember(
+    val user: TgUser,
+    val status: String,
 )
 
 class TelegramException(val responseBody: String?) : Exception(
@@ -393,7 +440,7 @@ interface TgApi {
     suspend fun getUpdates(
         @Query("offset") offset: Int,
         @Query("timeout") timeout: Int,
-        @Query("allowed_updates") allowedUpdates: List<String> = listOf("message"),
+        @Query("allowed_updates") allowedUpdates: List<String> = listOf("message", "callback_query"),
     ): TgResponse<List<TgUpdate>>
 
     @POST("deleteWebhook")
@@ -401,6 +448,15 @@ interface TgApi {
 
     @GET("getFile")
     suspend fun getFile(@Query("file_id") fileId: String): TgResponse<TgFile>
+
+    @POST("answerCallbackQuery")
+    suspend fun answerCallbackQuery(@Body data: TgAnswerCallbackQueryRequest): TgResponse<Boolean>
+
+    @GET("getChatMember")
+    suspend fun getChatMember(
+        @Query("chat_id") chatId: String,
+        @Query("user_id") userId: Long,
+    ): TgResponse<TgChatMember>
 
     @Streaming
     @GET
@@ -447,6 +503,7 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
     private var pollTask: Job? = null
     private val commandHandlers: MutableList<suspend (TgMessage) -> Boolean> = mutableListOf()
     private val messageHandlers: MutableList<suspend (TgMessage) -> Unit> = mutableListOf()
+    private val callbackHandlers: MutableList<suspend (TgCallbackQuery) -> Boolean> = mutableListOf()
     lateinit var me: TgUser
         private set
 
@@ -461,6 +518,10 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
 
     fun registerMessageHandler(handler: Consumer<TgMessage>) {
         messageHandlers.add(handler::accept)
+    }
+
+    fun registerCallbackHandler(handler: suspend (TgCallbackQuery) -> Boolean) {
+        callbackHandlers.add(handler)
     }
 
     fun registerCommandHandler(command: String, handler: suspend (TgMessage) -> Unit) {
@@ -512,6 +573,13 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
                     }
                     offset = updates.last().updateId + 1
                     updates.forEach { update ->
+                        if (update.callbackQuery != null) {
+                            for (handler in callbackHandlers) {
+                                if (handler.invoke(update.callbackQuery)) {
+                                    return@forEach
+                                }
+                            }
+                        }
                         if (update.message == null) {
                             return@forEach
                         }
@@ -623,6 +691,7 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
         parseMode: String? = null,
         disableWebPagePreview: Boolean = true,
         disableNotification: Boolean = false,
+        replyMarkup: TgReplyMarkup? = null,
     ): TgMessage = retriableCall {
         client.sendMessage(
             TgSendMessageRequest(
@@ -633,6 +702,7 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
                 parseMode,
                 disableWebPagePreview,
                 disableNotification,
+                replyMarkup,
             )
         )
     }
@@ -644,7 +714,18 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
         replyToMessageId: Int? = null,
         parseMode: String? = null,
         disableWebPagePreview: Boolean = true,
-    ) = scope.future { sendMessage(chatId, text, entities, replyToMessageId, parseMode, disableWebPagePreview) }
+        replyMarkup: TgReplyMarkup? = null,
+    ) = scope.future {
+        sendMessage(
+            chatId,
+            text,
+            entities,
+            replyToMessageId,
+            parseMode,
+            disableWebPagePreview,
+            replyMarkup = replyMarkup
+        )
+    }
 
     // TODO: wtf
     suspend fun sendVoice(
@@ -784,6 +865,18 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
 
     fun deleteMessageAsync(chatId: Long, messageId: Int) = scope.future {
         deleteMessage(chatId, messageId)
+    }
+
+    suspend fun answerCallbackQuery(
+        callbackQueryId: String,
+        text: String? = null,
+        showAlert: Boolean = false
+    ): Boolean = retriableCall {
+        client.answerCallbackQuery(TgAnswerCallbackQueryRequest(callbackQueryId, text, showAlert))
+    }
+
+    suspend fun getChatMember(chatId: String, userId: Long): TgChatMember = retriableCall {
+        client.getChatMember(chatId, userId)
     }
 
     suspend fun downloadFile(fileId: String): Response<ResponseBody> {

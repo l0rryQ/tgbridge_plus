@@ -1,0 +1,19 @@
+
+> Configure project :fabric
+Fabric Loom: 1.14.10
+Previous process has disowned the lock due to abrupt termination.
+Found existing cache lock file (ACQUIRED_PREVIOUS_OWNER_DISOWNED), rebuilding loom cache. This may have been caused by a failed or canceled build.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+A problem occurred configuring project ':fabric'.
+> Failed to setup Minecraft, java.lang.IllegalStateException: Minecraft 26.2 requires Java 25 but Gradle is using 21
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
