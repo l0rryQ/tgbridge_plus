@@ -1,0 +1,66 @@
+package net.flectone.pulse.platform.sender;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.config.setting.PermissionSetting;
+import net.flectone.pulse.model.entity.FEntity;
+import net.flectone.pulse.model.entity.FPlayer;
+import net.flectone.pulse.model.util.Sound;
+import net.flectone.pulse.platform.adapter.PlatformPlayerAdapter;
+import net.flectone.pulse.util.checker.PermissionChecker;
+import org.apache.commons.lang3.tuple.Pair;
+import org.joml.Vector3d;
+
+import java.util.Arrays;
+
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class HytaleSoundPlayer implements SoundPlayer {
+
+    private final PermissionChecker permissionChecker;
+    private final PlatformPlayerAdapter platformPlayerAdapter;
+
+    @Override
+    public void play(Pair<Sound, PermissionSetting> soundPermission, FEntity sender, FPlayer receiver) {
+        if (soundPermission == null) return;
+
+        Sound sound = soundPermission.getLeft();
+        if (sound == null || !sound.enable()) return;
+        if (!permissionChecker.check(sender, soundPermission.getRight())) return;
+
+        Object player = platformPlayerAdapter.convertToPlatformPlayer(receiver);
+        if (!(player instanceof PlayerRef playerRef)) return;
+
+        Ref<EntityStore> playerStoreRef = playerRef.getReference();
+        if (playerStoreRef == null) return;
+
+        World world = playerStoreRef.getStore().getExternalData().getWorld();
+        EntityStore worldStore = world.getEntityStore();
+
+        int index = SoundEvent.getAssetMap().getIndex(sound.name());
+
+        SoundCategory category = Arrays.stream(SoundCategory.VALUES)
+                .filter(soundCategory -> soundCategory.name().equalsIgnoreCase(sound.category()))
+                .findAny()
+                .orElse(SoundCategory.UI);
+
+        playerStoreRef.getStore().getExternalData().getWorld().execute(() -> {
+            TransformComponent transform = worldStore.getStore().getComponent(playerStoreRef, EntityModule.get().getTransformComponentType());
+            if (transform == null) return;
+
+            Vector3d position = transform.getPosition();
+            SoundUtil.playSoundEvent3dToPlayer(playerStoreRef, index, category, position.x, position.y, position.z, sound.volume(), sound.pitch(), worldStore.getStore());
+        });
+    }
+
+}

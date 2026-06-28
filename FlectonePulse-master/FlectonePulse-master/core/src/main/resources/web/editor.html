@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/web/static/images/favicon.png">
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/addon/dialog/dialog.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/mode/yaml/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/addon/search/search.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/addon/search/jump-to-line.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/addon/dialog/dialog.min.js"></script>
+    <link rel="stylesheet" href="/web/static/css/styles.css">
+    <link rel="stylesheet" href="/web/static/css/editor.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="header">
+    <div class="header-title">
+        <div class="logo">
+            <div class="logo-icon">
+                <img src="/web/static/images/favicon.png" alt="Logo" width="36" height="36">
+            </div>
+            <div class="logo-text" data-i18n="title">{{title}}</div>
+        </div>
+    </div>
+    <div class="header-actions">
+        <a href="https://flectone.net/pulse/docs/" target="_blank" class="doc-link" data-i18n="documentation">
+            <i class="fas fa-book"></i> {{documentation}}
+        </a>
+        <button id="logout-btn" data-i18n="logout">
+            <i class="fas fa-sign-out-alt"></i> {{logout}}
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="sidebar">
+        <div class="file-group">
+            <div class="group-title" data-i18n="mainConfigs">
+                <i class="fas fa-cog"></i>
+                {{mainConfigs}}
+            </div>
+            {{mainFiles}}
+        </div>
+
+        <div class="file-group">
+            <div class="group-title" data-i18n="localizations">
+                <i class="fas fa-globe"></i>
+                {{localizations}}
+            </div>
+            {{localeFiles}}
+        </div>
+    </div>
+
+    <div class="editor-container">
+        <div class="editor-header">
+            <div class="editor-title">
+                <i class="fas fa-file-code"></i>
+                <span id="current-file" data-i18n="selectFile">{{selectFile}}</span>
+            </div>
+            <div class="editor-actions">
+                <button id="save-btn" data-i18n="saveChanges">
+                    <i class="fas fa-save"></i> {{saveChanges}}
+                </button>
+            </div>
+        </div>
+        <textarea id="yaml-editor"></textarea>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fas fa-info-circle"></i>
+        <span id="toast-message"></span>
+        <button class="copy-btn" id="copy-btn"><i class="fas fa-copy"></i></button>
+    </div>
+</div>
+
+<script src="/web/static/script/editor.js"></script>
+</body>
+</html>

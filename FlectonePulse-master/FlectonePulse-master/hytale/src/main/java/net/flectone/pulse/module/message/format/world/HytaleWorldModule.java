@@ -1,0 +1,49 @@
+package net.flectone.pulse.module.message.format.world;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import net.flectone.pulse.execution.pipeline.MessagePipeline;
+import net.flectone.pulse.execution.scheduler.TaskScheduler;
+import net.flectone.pulse.model.util.Ticker;
+import net.flectone.pulse.module.message.format.world.listener.WorldHytaleListener;
+import net.flectone.pulse.platform.adapter.PlatformPlayerAdapter;
+import net.flectone.pulse.platform.controller.ModuleController;
+import net.flectone.pulse.platform.registry.ListenerRegistry;
+import net.flectone.pulse.service.FPlayerService;
+import net.flectone.pulse.service.SocialService;
+import net.flectone.pulse.util.file.FileFacade;
+
+@Singleton
+public class HytaleWorldModule extends WorldModule {
+
+    private final ListenerRegistry listenerRegistry;
+    private final TaskScheduler taskScheduler;
+
+    @Inject
+    public HytaleWorldModule(FileFacade fileFacade,
+                             FPlayerService fPlayerService,
+                             SocialService socialService,
+                             PlatformPlayerAdapter platformPlayerAdapter,
+                             ListenerRegistry listenerRegistry,
+                             TaskScheduler taskScheduler,
+                             MessagePipeline messagePipeline,
+                             ModuleController moduleController) {
+        super(fileFacade, fPlayerService, socialService, platformPlayerAdapter, listenerRegistry, taskScheduler, messagePipeline, moduleController);
+
+        this.listenerRegistry = listenerRegistry;
+        this.taskScheduler = taskScheduler;
+    }
+
+    @Override
+    public void onEnable() {
+        super.onEnable();
+
+        Ticker ticker = config().ticker();
+        if (ticker.enable()) {
+            taskScheduler.runPlayerAsyncTimer(this::update, ticker.period());
+        }
+
+        listenerRegistry.register(WorldHytaleListener.class);
+    }
+
+}

@@ -1,0 +1,48 @@
+package net.flectone.pulse.module.integration.supervanish;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.config.Integration;
+import net.flectone.pulse.config.Permission;
+import net.flectone.pulse.module.ModuleSimple;
+import net.flectone.pulse.platform.registry.ListenerRegistry;
+import net.flectone.pulse.util.constant.ModuleName;
+import net.flectone.pulse.util.file.FileFacade;
+
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class BukkitSuperVanishModule implements ModuleSimple {
+
+    private final FileFacade fileFacade;
+    private final BukkitSuperVanishIntegration superVanishIntegration;
+    private final ListenerRegistry listenerRegistry;
+
+    @Override
+    public void onEnable() {
+        listenerRegistry.register(BukkitSuperVanishIntegration.class);
+
+        superVanishIntegration.hook();
+    }
+
+    @Override
+    public void onDisable() {
+        superVanishIntegration.unhook();
+    }
+
+    @Override
+    public ModuleName name() {
+        return ModuleName.INTEGRATION_SUPERVANISH;
+    }
+
+    @Override
+    public Integration.Supervanish config() {
+        return fileFacade.integration().supervanish();
+    }
+
+    @Override
+    public Permission.Integration.Supervanish permission() {
+        return fileFacade.permission().integration().supervanish();
+    }
+
+}

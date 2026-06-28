@@ -1,0 +1,154 @@
+package net.flectone.pulse.module.message.bossbar;
+
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBossBar;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import net.flectone.pulse.config.Localization;
+import net.flectone.pulse.config.Message;
+import net.flectone.pulse.execution.dispatcher.MessageDispatcher;
+import net.flectone.pulse.execution.pipeline.MessagePipeline;
+import net.flectone.pulse.execution.scheduler.TaskScheduler;
+import net.flectone.pulse.model.entity.FPlayer;
+import net.flectone.pulse.model.event.EventMetadata;
+import net.flectone.pulse.model.event.message.context.MessageContext;
+import net.flectone.pulse.module.message.bossbar.listener.MinecraftPacketBossbarListener;
+import net.flectone.pulse.platform.controller.ModuleController;
+import net.flectone.pulse.platform.registry.ListenerRegistry;
+import net.flectone.pulse.platform.sender.MinecraftPacketSender;
+import net.flectone.pulse.service.FPlayerService;
+import net.flectone.pulse.service.SocialService;
+import net.flectone.pulse.util.constant.ModuleName;
+import net.flectone.pulse.util.file.FileFacade;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TranslatableComponent;
+import net.kyori.adventure.text.minimessage.tag.Tag;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.UUID;
+
+@Singleton
+public class MinecraftBossbarModule extends BossbarModule {
+
+    private static final String RAIDERS_REMAINING_KEY = "event.minecraft.raid.raiders_remaining";
+    private static final String RAIDERS_PLACEHOLDER = "<raiders>";
+
+    private final FPlayerService fPlayerService;
+    private final SocialService socialService;
+    private final TaskScheduler taskScheduler;
+    private final MessagePipeline messagePipeline;
+    private final MessageDispatcher messageDispatcher;
+    private final ModuleController moduleController;
+    private final MinecraftPacketSender packetSender;
+    private final ListenerRegistry listenerRegistry;
+
+    @Inject
+    public MinecraftBossbarModule(FileFacade fileFacade,
+                                  FPlayerService fPlayerService,
+                                  SocialService socialService,
+                                  ListenerRegistry listenerRegistry,
+                                  MessagePipeline messagePipeline,
+                                  MessageDispatcher messageDispatcher,
+                                  ModuleController moduleController,
+                                  MinecraftPacketSender packetSender,
+                                  TaskScheduler taskScheduler) {
+        super(fileFacade, socialService);
+
+        this.fPlayerService = fPlayerService;
+        this.socialService = socialService;
+        this.taskScheduler = taskScheduler;
+        this.messagePipeline = messagePipeline;
+        this.messageDispatcher = messageDispatcher;
+        this.moduleController = moduleController;
+        this.packetSender = packetSender;
+        this.listenerRegistry = listenerRegistry;
+    }
+
+    @Override
+    public void onEnable() {
+        super.onEnable();
+
+        listenerRegistry.register(MinecraftPacketBossbarListener.class);
+    }
+
+    public void send(UUID playerUUID, UUID bossbarUUID, String translationKey, boolean announce, Component oldTitle) {
+        FPlayer fPlayer = fPlayerService.getFPlayer(playerUUID);
+        taskScheduler.runAsync(() -> {
+            if (moduleController.isDisabledFor(this, fPlayer)) return;
+            if (!socialService.isSetting(fPlayer, ModuleName.MESSAGE_BOSSBAR)) return;
+
+            String message = localization(fPlayer).types().get(translationKey);
+            if (StringUtils.isEmpty(message)) return;
+
+            // it looks strange, but this is the only way to make normal color and message support
+            // remaining_raiders fits into other messages under certain conditions,
+            // so we need to add it here as well
+            String raiders = extractRemainingRaiders(oldTitle);
+            if (StringUtils.isNotEmpty(raiders)) {
+                message = message + RAIDERS_PLACEHOLDER;
+            }
+
+            Component title = messagePipeline.build(MessageContext.builder()
+                    .sender(fPlayer)
+                    .message(message)
+                    .tagResolver(raidersTag(fPlayer, raiders))
+                    .build()
+            );
+            if (title.equals(oldTitle)) return;
+
+            WrapperPlayServerBossBar wrapper = new WrapperPlayServerBossBar(bossbarUUID, WrapperPlayServerBossBar.Action.UPDATE_TITLE);
+            wrapper.setTitle(title);
+
+            packetSender.send(fPlayer, wrapper);
+
+            Message.Bossbar.Announce messageAnnounce = config().announce().get(translationKey);
+            if (announce && messageAnnounce != null) {
+                messageDispatcher.dispatch(this, EventMetadata.<Localization.Message.Bossbar>builder()
+                        .sender(fPlayer)
+                        .format(localization -> Strings.CS.replace(
+                                StringUtils.defaultString(localization.announce().get(translationKey)),
+                                RAIDERS_PLACEHOLDER,
+                                raiders
+                        ))
+                        .destination(messageAnnounce.destination())
+                        .sound(Pair.of(messageAnnounce.sound(), permission().types().get(translationKey)))
+                        .build()
+                );
+            }
+        });
+    }
+
+    private TagResolver raidersTag(FPlayer fPlayer, String raiders) {
+        String tag = "raiders";
+        if (StringUtils.isEmpty(raiders)) return MessagePipeline.ReplacementTag.emptyResolver(tag);
+
+        return messagePipeline.resolver(tag, (_, _) -> {
+            String raidersRemaining = localization(fPlayer).types().get(RAIDERS_REMAINING_KEY);
+            if (StringUtils.isEmpty(raidersRemaining)) return MessagePipeline.ReplacementTag.emptyTag();
+
+            return Tag.selfClosingInserting(messagePipeline.build(MessageContext.builder()
+                    .sender(fPlayer)
+                    .message(Strings.CS.replace(raidersRemaining, RAIDERS_PLACEHOLDER, raiders))
+                    .build()
+            ));
+        });
+    }
+
+    private String extractRemainingRaiders(Component oldTitle) {
+        if (oldTitle.children().isEmpty()) return "";
+
+        for (Component child : oldTitle.children()) {
+            if (child instanceof TranslatableComponent remaining
+                    && remaining.key().equals(RAIDERS_REMAINING_KEY)
+                    && !remaining.arguments().isEmpty()) {
+
+                return String.valueOf(remaining.arguments().getFirst().value());
+            }
+        }
+
+        return "";
+    }
+
+}

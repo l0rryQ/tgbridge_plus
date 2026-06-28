@@ -1,0 +1,79 @@
+package net.flectone.pulse.platform.sender;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.config.Localization;
+import net.flectone.pulse.execution.dispatcher.EventDispatcher;
+import net.flectone.pulse.execution.pipeline.MessagePipeline;
+import net.flectone.pulse.model.entity.FEntity;
+import net.flectone.pulse.model.entity.FPlayer;
+import net.flectone.pulse.model.event.message.MessageSendEvent;
+import net.flectone.pulse.model.event.message.context.MessageContext;
+import net.flectone.pulse.service.SocialService;
+import net.flectone.pulse.util.constant.ModuleName;
+import net.flectone.pulse.util.constant.SettingText;
+import net.flectone.pulse.util.file.FileFacade;
+import net.kyori.adventure.text.Component;
+
+/**
+ * Sends disable messages when chat features are disabled for players.
+ *
+ * <p><b>Usage example:</b>
+ * <pre>{@code
+ * DisableSender disableSender = flectonePulse.get(DisableSender.class);
+ *
+ * // Check if private messaging is disabled for receiver
+ * if (disableSender.sendIfDisabled(sender, receiver, MessageType.COMMAND_ME)) {
+ *     // Private messaging is disabled for receiver
+ * }
+ * }</pre>
+ *
+ * @author TheFaser
+ * @since 1.6.0
+ */
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class DisableSender {
+
+    private final FileFacade fileFacade;
+    private final MessagePipeline messagePipeline;
+    private final EventDispatcher eventDispatcher;
+    private final SocialService socialService;
+
+    /**
+     * Checks if a message type is disabled for a receiver and sends appropriate message.
+     *
+     * @param entity the entity sending the message
+     * @param receiver the entity receiving the message
+     * @param moduleName the type of message being sent
+     * @return true if message type is disabled for receiver, false otherwise
+     */
+    public boolean sendIfDisabled(FEntity entity, FEntity receiver, ModuleName moduleName) {
+        if (!(receiver instanceof FPlayer fReceiver)) return false;
+        if (fReceiver.isUnknown()) return false;
+        if (socialService.isSetting(fReceiver, moduleName)) return false;
+
+        // skip message for entities
+        if (!(entity instanceof FPlayer fPlayer)) return true;
+
+        Localization.Command.Chatsetting localization = fileFacade.localization(socialService.getSetting(fReceiver, SettingText.LOCALE)).command().chatsetting();
+
+        String disableMessage = fPlayer.equals(fReceiver)
+                ? localization.disabledSelf()
+                : localization.disabledOther();
+
+        MessageContext messageContext = MessageContext.builder()
+                .sender(receiver)
+                .receiver(fPlayer)
+                .message(disableMessage)
+                .build();
+
+        Component component = messagePipeline.build(messageContext);
+
+        eventDispatcher.dispatch(new MessageSendEvent(ModuleName.ERROR, fPlayer, component));
+
+        return true;
+    }
+
+}

@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+    }
+}
+
+include "core"
+include "hytale"
+include "minecraft:common"
+include "minecraft:fabric"
+include "minecraft:bukkit"
+include "minecraft:paper"
+include "minecraft:velocity"
+include "minecraft:bungeecord"
+include 'minecraft:neoforge'
