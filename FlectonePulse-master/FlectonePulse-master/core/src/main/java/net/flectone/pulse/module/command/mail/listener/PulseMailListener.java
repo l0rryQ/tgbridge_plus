@@ -1,0 +1,63 @@
+package net.flectone.pulse.module.command.mail.listener;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.annotation.Pulse;
+import net.flectone.pulse.config.Localization;
+import net.flectone.pulse.execution.dispatcher.MessageDispatcher;
+import net.flectone.pulse.listener.PulseListener;
+import net.flectone.pulse.model.entity.FPlayer;
+import net.flectone.pulse.model.event.EventMetadata;
+import net.flectone.pulse.model.event.player.PlayerJoinEvent;
+import net.flectone.pulse.module.command.mail.MailModule;
+import net.flectone.pulse.module.command.mail.model.Mail;
+import net.flectone.pulse.module.command.mail.model.MailMetadata;
+import net.flectone.pulse.platform.controller.ModuleController;
+import net.flectone.pulse.service.FPlayerService;
+import net.flectone.pulse.service.SocialService;
+import net.flectone.pulse.util.constant.MessageFlag;
+
+import java.util.List;
+
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class PulseMailListener implements PulseListener {
+
+    private final MailModule mailModule;
+    private final FPlayerService fPlayerService;
+    private final SocialService socialService;
+    private final MessageDispatcher messageDispatcher;
+    private final ModuleController moduleController;
+
+    @Pulse
+    public void onPlayerJoinEvent(PlayerJoinEvent event) {
+        FPlayer fReceiver = event.player();
+        if (moduleController.isDisabledFor(mailModule, fReceiver)) return;
+
+        List<Mail> mails = socialService.getReceiverMails(fReceiver);
+        if (mails.isEmpty()) return;
+
+        for (Mail mail : mails) {
+            FPlayer fPlayer = fPlayerService.getFPlayer(mail.sender());
+
+            messageDispatcher.dispatch(mailModule, MailMetadata.<Localization.Command.Mail>builder()
+                    .base(EventMetadata.<Localization.Command.Mail>builder()
+                            .sender(fPlayer)
+                            .receiver(fReceiver)
+                            .flag(MessageFlag.COLOR_CONTEXT_SENDER, false)
+                            .format(Localization.Command.Mail::receiver)
+                            .destination(mailModule.config().destination())
+                            .message(mail.message())
+                            .build()
+                    )
+                    .mail(mail)
+                    .target(fReceiver)
+                    .build()
+            );
+
+            socialService.deleteMail(mail);
+        }
+    }
+
+}

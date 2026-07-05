@@ -1,0 +1,46 @@
+package net.flectone.pulse.module.command.flectonepulse.web;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.module.command.flectonepulse.web.controller.EditorController;
+import net.flectone.pulse.util.file.FileFacade;
+import spark.Service;
+
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class SparkServer {
+
+    private final FileFacade fileFacade;
+    private final EditorController controller;
+
+    private Service sparkService;
+
+    public boolean isEnable() {
+        return sparkService != null;
+    }
+
+    public void onEnable() {
+        if (sparkService != null) {
+            sparkService.stop();
+        }
+
+        sparkService = Service.ignite();
+        sparkService.port(fileFacade.command().flectonepulse().editor().port());
+        sparkService.staticFiles.location("/");
+
+        sparkService.before((_, res) -> res.type("text/html; charset=utf-8"));
+
+        controller.initConfigFiles();
+        controller.setupRoutes(sparkService);
+        sparkService.init();
+    }
+
+    public void onDisable() {
+        if (sparkService != null) {
+            sparkService.stop();
+            sparkService = null;
+        }
+    }
+
+}

@@ -1,0 +1,131 @@
+package net.flectone.pulse;
+
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.PacketEventsAPI;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Singleton;
+import com.google.inject.Stage;
+import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
+import lombok.Getter;
+import net.flectone.pulse.exception.ReloadException;
+import net.flectone.pulse.execution.scheduler.TaskScheduler;
+import net.flectone.pulse.platform.controller.MinecraftDialogController;
+import net.flectone.pulse.platform.controller.MinecraftInventoryController;
+import net.flectone.pulse.processing.resolver.BukkitLibraryResolver;
+import net.flectone.pulse.processing.resolver.LibraryResolver;
+import net.flectone.pulse.util.file.FileFacade;
+import net.flectone.pulse.util.logging.FLogger;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
+
+@Getter
+@Singleton
+public class BukkitFlectonePulse extends JavaPlugin implements FlectonePulse {
+
+    private FLogger fLogger;
+    private LibraryResolver libraryResolver;
+    private Injector injector;
+
+    @Override
+    public void onLoad() {
+        // initialize custom logger
+        fLogger = new FLogger(
+                logRecord -> this.getLogger().log(logRecord),
+                () -> injector == null ? null : injector.getInstance(FileFacade.class)
+        );
+        fLogger.logEnabling();
+
+        // set up library resolver for dependency loading
+        libraryResolver = new BukkitLibraryResolver(this);
+        libraryResolver.addLibraries();
+        libraryResolver.resolveRepositories();
+        libraryResolver.loadLibraries();
+
+        // configure packetevents api
+        System.setProperty("packetevents.nbt.default-max-size", "2097152");
+        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
+        PacketEvents.getAPI().getSettings().reEncodeByDefault(false).checkForUpdates(false).debug(false);
+
+        try {
+            // create guice injector for dependency injection
+            injector = Guice.createInjector(Stage.PRODUCTION, new BukkitInjector(this, this, libraryResolver, fLogger));
+        } catch (Exception e) {
+            throwInitException(e);
+        }
+
+        PacketEvents.getAPI().load();
+    }
+
+    @Override
+    public void onEnable() {
+        if (!isReady()) {
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // get scheduler
+        TaskScheduler taskScheduler = get(TaskScheduler.class);
+
+        // create executor
+        taskScheduler.start();
+
+        // update tick
+        injector.getInstance(com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler.class).runTaskTimer(taskScheduler::onTick, 1L, 1L);
+
+        get(FlectonePulseAPI.class).onEnable();
+    }
+
+    @Override
+    public void onDisable() {
+        if (!isReady()) {
+            terminateFailedPacketAdapter();
+            return;
+        }
+
+        get(FlectonePulseAPI.class).onDisable();
+
+        // cancel custom tasks
+        injector.getInstance(com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler.class).cancelTasks(this);
+    }
+
+    @Override
+    public void reload() throws ReloadException {
+        if (!isReady()) return;
+
+        get(FlectonePulseAPI.class).reload();
+    }
+
+    @Override
+    public void initPacketAdapter() {
+        PacketEvents.getAPI().init();
+    }
+
+    @Override
+    public void terminateFailedPacketAdapter() {
+        try {
+            // check PacketEvents class
+            Class.forName("com.github.retrooper.packetevents.PacketEvents");
+
+            PacketEventsAPI<?> packetEventsAPI = PacketEvents.getAPI();
+            if (!packetEventsAPI.isInitialized()) {
+                packetEventsAPI.getInjector().uninject();
+            }
+        } catch (Exception _) {
+            // ignore
+        }
+    }
+
+    @Override
+    public void terminatePacketAdapter() {
+        PacketEvents.getAPI().terminate();
+    }
+
+    @Override
+    public void closeUIs() {
+        // close all open inventories
+        injector.getInstance(MinecraftInventoryController.class).closeAll();
+        injector.getInstance(MinecraftDialogController.class).closeAll();
+    }
+
+}

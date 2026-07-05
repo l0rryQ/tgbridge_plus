@@ -1,0 +1,128 @@
+package net.flectone.pulse.module.command.helper;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.flectone.pulse.config.Command;
+import net.flectone.pulse.config.Localization;
+import net.flectone.pulse.config.Permission;
+import net.flectone.pulse.config.setting.PermissionSetting;
+import net.flectone.pulse.execution.dispatcher.MessageDispatcher;
+import net.flectone.pulse.model.entity.FPlayer;
+import net.flectone.pulse.model.event.EventMetadata;
+import net.flectone.pulse.module.ModuleCommand;
+import net.flectone.pulse.platform.controller.ModuleCommandController;
+import net.flectone.pulse.platform.controller.ModuleController;
+import net.flectone.pulse.platform.provider.CommandParserProvider;
+import net.flectone.pulse.platform.registry.ProxyRegistry;
+import net.flectone.pulse.service.FPlayerService;
+import net.flectone.pulse.service.SocialService;
+import net.flectone.pulse.util.checker.PermissionChecker;
+import net.flectone.pulse.util.constant.ModuleName;
+import net.flectone.pulse.util.constant.SettingText;
+import net.flectone.pulse.util.file.FileFacade;
+import org.incendo.cloud.context.CommandContext;
+
+import java.util.List;
+import java.util.function.Predicate;
+
+@Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
+public class HelperModule implements ModuleCommand<Localization.Command.Helper> {
+
+    private final FileFacade fileFacade;
+    private final FPlayerService fPlayerService;
+    private final ProxyRegistry proxyRegistry;
+    private final PermissionChecker permissionChecker;
+    private final CommandParserProvider commandParserProvider;
+    private final MessageDispatcher messageDispatcher;
+    private final ModuleController moduleController;
+    private final ModuleCommandController commandModuleController;
+    private final SocialService socialService;
+
+    @Override
+    public void onEnable() {
+        String promptMessage = commandModuleController.addPrompt(this, 0, Localization.Command.Prompt::message);
+        commandModuleController.registerCommand(this, commandBuilder -> commandBuilder
+                .permission(permission().name())
+                .required(promptMessage, commandParserProvider.nativeMessageParser())
+        );
+    }
+
+    @Override
+    public void onDisable() {
+        commandModuleController.clearPrompts(this);
+    }
+
+    @Override
+    public ImmutableSet.Builder<PermissionSetting> permissionBuilder() {
+        return ModuleCommand.super.permissionBuilder().add(permission().see());
+    }
+
+    @Override
+    public void execute(FPlayer fPlayer, CommandContext<FPlayer> commandContext) {
+        if (moduleController.isDisabledFor(this, fPlayer, true)) return;
+
+        List<FPlayer> recipients = fPlayerService.getOnlineFPlayers()
+                .stream()
+                .filter(vanishedPlayer -> socialService.canSeeVanished(vanishedPlayer, fPlayer))
+                .filter(getFilterSee())
+                .toList();
+
+        if (recipients.isEmpty() && config().nullHelper()) {
+            messageDispatcher.dispatchError(this, EventMetadata.<Localization.Command.Helper>builder()
+                    .sender(fPlayer)
+                    .format(Localization.Command.Helper::nullHelper)
+                    .build()
+            );
+            return;
+        }
+
+        String message = commandModuleController.getArgument(this, commandContext, 0);
+
+        messageDispatcher.dispatch(this, EventMetadata.<Localization.Command.Helper>builder()
+                .sender(fPlayer)
+                .format(Localization.Command.Helper::player)
+                .destination(config().destination())
+                .build()
+        );
+
+        messageDispatcher.dispatch(this, EventMetadata.<Localization.Command.Helper>builder()
+                .sender(fPlayer)
+                .format(Localization.Command.Helper::global)
+                .destination(config().destination())
+                .range(config().range())
+                .message(message)
+                .filter(getFilterSee())
+                .proxy(dataOutputStream -> dataOutputStream.writeString(message))
+                .integration()
+                .sound(soundOrThrow())
+                .build()
+        );
+    }
+
+    @Override
+    public ModuleName name() {
+        return ModuleName.COMMAND_HELPER;
+    }
+
+    @Override
+    public Command.Helper config() {
+        return fileFacade.command().helper();
+    }
+
+    @Override
+    public Permission.Command.Helper permission() {
+        return fileFacade.permission().command().helper();
+    }
+
+    @Override
+    public Localization.Command.Helper localization(FPlayer fPlayer) {
+        return fileFacade.localization(socialService.getSetting(fPlayer, SettingText.LOCALE)).command().helper();
+    }
+
+    public Predicate<FPlayer> getFilterSee() {
+        return fPlayer -> permissionChecker.check(fPlayer, permission().see());
+    }
+}

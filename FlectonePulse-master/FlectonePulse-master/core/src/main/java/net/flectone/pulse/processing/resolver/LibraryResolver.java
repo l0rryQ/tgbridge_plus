@@ -1,0 +1,223 @@
+package net.flectone.pulse.processing.resolver;
+
+import com.alessiodp.libby.Library;
+import com.alessiodp.libby.LibraryManager;
+import com.alessiodp.libby.relocation.Relocation;
+import com.google.inject.Singleton;
+import lombok.Getter;
+import net.flectone.pulse.BuildConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Singleton
+public class LibraryResolver {
+
+    private final List<Library> libraries = new ArrayList<>();
+
+    @Getter private final LibraryManager libraryManager;
+
+    public LibraryResolver(LibraryManager libraryManager) {
+        this.libraryManager = libraryManager;
+    }
+
+    public List<String> getAdventureArtifactIds() {
+        return List.of(
+                "adventure-api",
+                "adventure-nbt",
+                "adventure-key",
+                "adventure-text-minimessage",
+                "adventure-text-serializer-ansi",
+                "adventure-text-serializer-plain",
+                "adventure-text-serializer-legacy",
+                "adventure-text-serializer-json-legacy-impl",
+                "adventure-text-serializer-gson"
+        );
+    }
+
+    public void addLibrary(Library library) {
+        libraries.add(library);
+    }
+
+    public void loadLibrary(Library library) {
+        libraryManager.loadLibrary(library);
+    }
+
+    public void loadLibraries(List<Library> libraries) {
+        libraries.forEach(this::loadLibrary);
+    }
+
+    public void loadLibraries() {
+        try {
+            loadLibraries(libraries);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("Failed to download library")) {
+                libraryManager.getLogger().error("\n\n====================\n A problem occurred while downloading the libraries, perhaps you do not have access to repository. \n Try downloading the libraries manually from https://flectone.net/files/r/FlectonePulse-libraries.zip and extract them into FlectonePulse folder \n====================\n");
+            }
+
+            throw e;
+        }
+    }
+
+    public void resolveRepositories() {
+        libraryManager.addRepository(BuildConfig.MAVEN_REPOSITORY);
+        libraryManager.addRepository(BuildConfig.CODEMC_REPOSITORY);
+        libraryManager.addRepository(BuildConfig.JITPACK_REPOSITORY);
+
+        libraryManager.addSonatype();
+        libraryManager.addJCenter();
+    }
+
+    public void addLibraries() {
+
+        addLibrary(Library.builder()
+                .groupId("com{}google{}inject")
+                .artifactId("guice")
+                .version(BuildConfig.GUICE_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}inject")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guice")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}common")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guava")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("com{}google{}code{}gson")
+                .artifactId("gson")
+                .version(BuildConfig.GSON_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}common")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guava")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}gson")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".gson")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("tools{}jackson{}dataformat")
+                .artifactId("jackson-dataformat-yaml")
+                .version(BuildConfig.JACKSON_DATAFORMAT_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("com{}fasterxml{}jackson")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".jackson")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("tools{}jackson")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".jackson")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("org{}snakeyaml{}engine")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".snakeyaml")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}common")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guava")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}gson")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".gson")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("it{}unimi{}dsi")
+                .artifactId("fastutil")
+                .version(BuildConfig.FASTUTIL_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .relocate(Relocation.builder()
+                        .pattern("it{}unimi{}dsi")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".fastutil")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("com{}zaxxer")
+                .artifactId("HikariCP")
+                .version(BuildConfig.HIKARICP_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .relocate(Relocation.builder()
+                        .pattern("com{}zaxxer{}hikari")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".hikari")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("org{}jdbi")
+                .artifactId("jdbi3-core")
+                .version(BuildConfig.JDBI3_CORE_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("org{}jdbi")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".jdbi3")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}common")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guava")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("org{}jdbi")
+                .artifactId("jdbi3-sqlobject")
+                .version(BuildConfig.JDBI3_CORE_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("org{}jdbi")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".jdbi3")
+                        .build()
+                )
+                .relocate(Relocation.builder()
+                        .pattern("com{}google{}common")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".guava")
+                        .build()
+                )
+                .build()
+        );
+
+        addLibrary(Library.builder()
+                .groupId("org{}apache{}commons")
+                .artifactId("commons-text")
+                .version(BuildConfig.APACHE_COMMONS_TEXT_VERSION)
+                .repository(BuildConfig.MAVEN_REPOSITORY)
+                .resolveTransitiveDependencies(true)
+                .relocate(Relocation.builder()
+                        .pattern("org{}apache{}commons")
+                        .relocatedPattern(BuildConfig.RELOCATED_PATTERN + ".apache")
+                        .build()
+                )
+                .build()
+        );
+    }
+}
