@@ -1,2 +1,4 @@
 ес че это вайбкод. 
-([<img src="[https://raw.githubusercontent.com/l0rryQ/tgbridge_plus/refs/heads/master/nu%20a%20cho%20mogu%20sebe%20pozvolit.mp4" alt="почему?" width="400" class="center">](https://github.com/D5Kostya/smetana_app/releases/latest))
+([<img src="[alt="почему?" width="400" class="center">](https://raw.githubusercontent.com/l0rryQ/tgbridge_plus/refs/heads/master/nu%20a%20cho%20mogu%20sebe%20pozvolit.mp4))
+
+
