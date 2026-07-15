@@ -1,4 +1,2 @@
-ес че это вайбкод. 
-(["почему?](https://raw.githubusercontent.com/l0rryQ/tgbridge_plus/refs/heads/master/nu%20a%20cho%20mogu%20sebe%20pozvolit.mp4))
-
+почему вайбкод? - https://github.com/user-attachments/assets/34de97a1-4083-4c7e-aa25-1aab1cdedb31
 
