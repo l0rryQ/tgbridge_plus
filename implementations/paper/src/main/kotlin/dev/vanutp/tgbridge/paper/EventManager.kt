@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.server.ServerLoadEvent
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import dev.vanutp.tgbridge.common.AuthManager
 import dev.vanutp.tgbridge.common.ConfigManager
 import dev.vanutp.tgbridge.common.TgInlineKeyboardButton
@@ -223,6 +224,37 @@ class EventManager(private val plugin: PaperBootstrap) : Listener {
                 return@setExecutor onSendCommand(commandSender.toTgbridge(), args)
             }
             return@setExecutor false
+        }
+
+        plugin.getCommand("tgacc")!!.setExecutor { commandSender, _, _, args ->
+            if (args.isEmpty()) {
+                commandSender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize("<red>Использование: /tgacc <ник></red>"))
+                return@setExecutor true
+            }
+            val nickname = args[0]
+            val player = AuthManager.getOrCreatePlayer(nickname)
+            if (player.tgId == null) {
+                commandSender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize("<red>Игрок $nickname не привязал свой Telegram-аккаунт.</red>"))
+                return@setExecutor true
+            }
+
+            // Run asynchronously since we are querying Telegram API!
+            plugin.tgbridge.coroutineScope.launch {
+                try {
+                    val chatInfo = plugin.tgbridge.bot.getChat(player.tgId!!.toString())
+                    val text = if (chatInfo.username != null) {
+                        "<green>Игрок $nickname привязан к Telegram-аккаунту: <aqua>@${chatInfo.username}</aqua></green>"
+                    } else {
+                        "<green>Игрок $nickname привязан к Telegram ID: <aqua>${chatInfo.id}</aqua></green>"
+                    }
+                    commandSender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(text))
+                } catch (ex: Exception) {
+                    plugin.tgbridge.logger.error("Failed to query telegram user info for ${player.tgId}", ex)
+                    val text = "<green>Игрок $nickname привязан к Telegram ID: <aqua>${player.tgId}</aqua> (не удалось получить имя)</green>"
+                    commandSender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(text))
+                }
+            }
+            return@setExecutor true
         }
     }
 }

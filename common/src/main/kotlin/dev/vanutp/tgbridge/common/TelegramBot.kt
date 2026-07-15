@@ -318,6 +318,17 @@ data class TgCallbackQuery(
 )
 
 @Serializable
+data class TgChatFullInfo(
+    val id: Long,
+    val type: String,
+    val username: String? = null,
+    @SerialName("first_name")
+    val firstName: String? = null,
+    @SerialName("last_name")
+    val lastName: String? = null,
+)
+
+@Serializable
 data class TgChatMember(
     val status: String,
 )
@@ -440,6 +451,11 @@ interface TgApi {
         @Query("chat_id") chatId: String,
         @Query("user_id") userId: Long,
     ): TgResponse<TgChatMember>
+
+    @GET("getChat")
+    suspend fun getChat(
+        @Query("chat_id") chatId: String,
+    ): TgResponse<TgChatFullInfo>
 
     @GET("getUpdates")
     suspend fun getUpdates(
@@ -921,5 +937,11 @@ class TelegramBot(botApiUrl: String, botToken: String, private val logger: ILogg
         userId: Long,
     ): TgChatMember = retriableCall {
         client.getChatMember(chatId, userId)
+    }
+
+    suspend fun getChat(
+        chatId: String,
+    ): TgChatFullInfo = retriableCall {
+        client.getChat(chatId)
     }
 }
