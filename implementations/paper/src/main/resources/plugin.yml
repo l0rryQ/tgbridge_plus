@@ -7,6 +7,9 @@ commands:
   tgbridge:
     description: Minecraft Telegram Bridge
     usage: /tgbridge <reload|toggle|send <format> <chat_name> <message>>
+  tgacc:
+    description: Get Telegram account linked to a Minecraft account
+    usage: /tgacc <nickname>
 softdepend:
   - voicechat
   - voicemessages

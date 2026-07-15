@@ -19,7 +19,7 @@ import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer
 
 abstract class TelegramBridge {
-    internal val coroutineScope = CoroutineScope(Dispatchers.IO).plus(SupervisorJob())
+    val coroutineScope = CoroutineScope(Dispatchers.IO).plus(SupervisorJob())
     abstract val logger: ILogger
     abstract val platform: IPlatform
     lateinit var bot: TelegramBot private set
@@ -589,6 +589,18 @@ abstract class TelegramBridge {
                 bot.sendMessage(
                     chatId = msg.chat.id,
                     text = "Код не найден или уже устарел. Попробуй зайти на сервер еще раз, чтобы получить новый код."
+                )
+                return
+            }
+
+            // Check if this Telegram ID is already linked to another Minecraft account
+            val existingPlayer = AuthManager.db.players.values.find { it.tgId == from.id && it.username != playerEntry.username }
+            if (existingPlayer != null) {
+                bot.sendMessage(
+                    chatId = msg.chat.id,
+                    text = "К этому Telegram-аккаунту уже привязан Minecraft-аккаунт: <b>${existingPlayer.username}</b>!\n" +
+                           "Вы не можете привязать более одного Minecraft-аккаунта к одному Telegram-аккаунту.",
+                    parseMode = "HTML"
                 )
                 return
             }
